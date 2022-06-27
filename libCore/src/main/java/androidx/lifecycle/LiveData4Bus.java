@@ -1,9 +1,7 @@
-package android.arch.lifecycle;
+package androidx.lifecycle;
 
-import static android.arch.lifecycle.Lifecycle.State.CREATED;
-import static android.arch.lifecycle.Lifecycle.State.DESTROYED;
 
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -22,7 +20,7 @@ public class LiveData4Bus<T> extends MutableLiveData<T> {
     /**
      * 何时接受消息 CREATED(default)/STARTED/RESUMED
      */
-    private Lifecycle.State targetState = CREATED;
+    private Lifecycle.State targetState = Lifecycle.State.CREATED;
 
     public LiveData4Bus() {
     }
@@ -32,8 +30,8 @@ public class LiveData4Bus<T> extends MutableLiveData<T> {
     }
 
     @Override
-    public void observe(@NonNull LifecycleOwner owner, @NonNull Observer<T> observer) {
-        if (owner.getLifecycle().getCurrentState() == DESTROYED) {
+    public void observe(@NonNull LifecycleOwner owner, @NonNull Observer<? super T> observer) {
+        if (owner.getLifecycle().getCurrentState() == Lifecycle.State.CREATED) {
             // 当前的观察者已经被销毁了，则不做任何事
             return;
         }
@@ -66,7 +64,7 @@ public class LiveData4Bus<T> extends MutableLiveData<T> {
      */
     class CustomLifecycleBoundObserver extends LifecycleBoundObserver {
 
-        CustomLifecycleBoundObserver(@NonNull LifecycleOwner owner, Observer<T> observer) {
+        CustomLifecycleBoundObserver(@NonNull LifecycleOwner owner, Observer<? super T> observer) {
             super(owner, observer);
         }
 

@@ -1,6 +1,6 @@
-package com.treasure.bus
+package com.treasure.bus.core
 
-import android.arch.lifecycle.Observer
+import androidx.lifecycle.Observer
 import com.treasure.bus.log.Logger
 import java.util.logging.Level
 

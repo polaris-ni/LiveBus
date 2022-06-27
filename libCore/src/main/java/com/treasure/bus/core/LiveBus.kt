@@ -1,4 +1,4 @@
-package com.treasure.bus
+package com.treasure.bus.core
 
 import com.treasure.bus.log.Logger
 
@@ -14,19 +14,16 @@ object LiveBus {
      */
     internal var bus = HashMap<String, LiveEvent<Any>>()
 
-    fun setLogger(logger: Logger) {
-        Logger.setLogger(logger)
-    }
+    fun setLogger(logger: Logger) = Logger.setLogger(logger)
 
-    fun enableLog() {
-        Logger.enableLog()
-    }
+    fun enableLog() = Logger.enableLog()
 
     private var lifecycleObserverAlwaysActive = false
     private var autoClear = false
 
+    @Suppress("UNCHECKED_CAST")
     @Synchronized
-    fun <T>with(key: String): Observable<T> {
+    fun <T> with(key: String): Observable<T> {
         if (!bus.containsKey(key)) {
             bus[key] = LiveEvent(key, lifecycleObserverAlwaysActive, autoClear)
         }
@@ -34,11 +31,11 @@ object LiveBus {
     }
 
     fun setLifecycleObserverAlwaysActive(lifecycleObserverAlwaysActive: Boolean) {
-        this.lifecycleObserverAlwaysActive = lifecycleObserverAlwaysActive
+        LiveBus.lifecycleObserverAlwaysActive = lifecycleObserverAlwaysActive
     }
 
     fun setAutoClear(autoClear: Boolean) {
-        this.autoClear = autoClear
+        LiveBus.autoClear = autoClear
     }
 
 }

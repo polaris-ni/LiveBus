@@ -1,7 +1,7 @@
-package com.treasure.bus
+package com.treasure.bus.core
 
-import android.arch.lifecycle.LifecycleOwner
-import android.arch.lifecycle.Observer
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.Observer
 
 /**
  * @author Liangyong Ni

@@ -1,10 +1,10 @@
-package com.treasure.bus
+package com.treasure.bus.core
 
-import android.arch.lifecycle.Lifecycle
-import android.arch.lifecycle.LifecycleOwner
-import android.arch.lifecycle.LiveData4Bus
-import android.arch.lifecycle.Observer
-import android.support.annotation.MainThread
+import androidx.annotation.MainThread
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LiveData4Bus
+import androidx.lifecycle.Observer
 import com.treasure.bus.log.Logger
 import java.util.logging.Level
 
@@ -18,6 +18,7 @@ class LiveEvent<T> constructor(
     private val lifecycleObserverAlwaysActive: Boolean,
     private val autoClear: Boolean = false
 ) : Observable<T> {
+
     private val liveData: LifecycleLiveData<T> = LifecycleLiveData(key)
 
     /**
@@ -26,12 +27,8 @@ class LiveEvent<T> constructor(
      * @param value 发送的消息
      */
     override fun post(value: T) {
-        if (isMainThread()) {
+        mainLaunch {
             postInternal(value)
-        } else {
-            mainLaunch {
-                postInternal(value)
-            }
         }
     }
 
@@ -70,19 +67,11 @@ class LiveEvent<T> constructor(
      * @param observer 观察者
      */
     override fun observe(owner: LifecycleOwner, isSticky: Boolean, observer: Observer<T>) {
-        if (isMainThread()) {
+        mainLaunch {
             if (!isSticky) {
                 observeInternal(owner, observer)
             } else {
                 observeStickyInternal(owner, observer)
-            }
-        } else {
-            mainLaunch {
-                if (!isSticky) {
-                    observeInternal(owner, observer)
-                } else {
-                    observeStickyInternal(owner, observer)
-                }
             }
         }
     }
@@ -93,19 +82,11 @@ class LiveEvent<T> constructor(
      * @param observer 观察者
      */
     override fun observeForever(observer: Observer<T>, isSticky: Boolean) {
-        if (isMainThread()) {
+        mainLaunch {
             if (!isSticky) {
                 observeForeverInternal(observer)
             } else {
                 observeStickyForeverInternal(observer)
-            }
-        } else {
-            mainLaunch {
-                if (!isSticky) {
-                    observeForeverInternal(observer)
-                } else {
-                    observeStickyForeverInternal(observer)
-                }
             }
         }
     }
@@ -173,8 +154,7 @@ class LiveEvent<T> constructor(
      */
     inner class LifecycleLiveData<T>(private val key: String) :
         LiveData4Bus<T>(if (lifecycleObserverAlwaysActive) Lifecycle.State.CREATED else Lifecycle.State.STARTED) {
-
-        override fun removeObserver(observer: Observer<T>) {
+        override fun removeObserver(observer: Observer<in T>) {
             super.removeObserver(observer)
             if (autoClear && !liveData.hasObservers()) {
                 LiveBus.bus.remove(key)
