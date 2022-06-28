@@ -5,24 +5,18 @@ import android.os.Looper
 import com.treasure.bus.log.Logger
 import java.util.logging.Level
 
-/**
- * @author Liangyong Ni
- * @date 2022/6/26
- * description Ktx
- */
-fun isMainThread() = Thread.currentThread() == Looper.getMainLooper().thread
-
 private val mainHandler = Handler(Looper.getMainLooper())
 
 /**
- * 具有异常处理机制并在主线程执行的协程启动器，适用于更新UI等操作
- * @param duration 延迟的时间
- * @param action 执行的协程体
- * @return Job
+ * 保证操作在主线程中执行
+ *
+ * @param duration  延迟的时间
+ * @param action    执行的操作
+ * @return [Result]
  */
-fun mainLaunch(duration: Long = 0L, action: () -> Unit) =
+internal fun mainLaunch(duration: Long = 0L, action: () -> Unit) =
     runCatching {
-        if (isMainThread()) {
+        if (Thread.currentThread() == Looper.getMainLooper().thread) {
             if (duration > 0) {
                 mainHandler.postDelayed(action, duration)
             } else {
@@ -36,5 +30,6 @@ fun mainLaunch(duration: Long = 0L, action: () -> Unit) =
             }
         }
     }.onFailure {
+        it.printStackTrace()
         Logger.log(Level.WARNING, null, it)
     }

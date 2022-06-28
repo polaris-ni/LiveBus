@@ -15,6 +15,7 @@ object Logger : ILogger {
 
     fun enableLog() {
         isEnable = true
+        log(Level.WARNING, "---------- Logger Enabled ----------")
     }
 
     fun setLogger(logger: ILogger) {

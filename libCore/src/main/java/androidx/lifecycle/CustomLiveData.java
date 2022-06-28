@@ -3,15 +3,18 @@ package androidx.lifecycle;
 
 import androidx.annotation.NonNull;
 
+import com.treasure.bus.log.Logger;
+
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.logging.Level;
 
 /**
  * @author Liangyong Ni
  * @date 2022/6/21 15:48
- * description: ExternalLiveData
+ * description: CustomLiveData 魔改的LiveData
  */
-public class LiveData4Bus<T> extends MutableLiveData<T> {
+public class CustomLiveData<T> extends MutableLiveData<T> {
 
     private static final String TAG = "LiveData4Bus";
 
@@ -20,12 +23,9 @@ public class LiveData4Bus<T> extends MutableLiveData<T> {
     /**
      * 何时接受消息 CREATED(default)/STARTED/RESUMED
      */
-    private Lifecycle.State targetState = Lifecycle.State.CREATED;
+    private final Lifecycle.State targetState;
 
-    public LiveData4Bus() {
-    }
-
-    public LiveData4Bus(Lifecycle.State targetState) {
+    public CustomLiveData(Lifecycle.State targetState) {
         this.targetState = targetState;
     }
 
@@ -51,6 +51,7 @@ public class LiveData4Bus<T> extends MutableLiveData<T> {
             owner.getLifecycle().addObserver(wrapper);
         } catch (Exception e) {
             e.printStackTrace();
+            Logger.INSTANCE.log(Level.WARNING, null, e);
         }
     }
 
@@ -83,8 +84,7 @@ public class LiveData4Bus<T> extends MutableLiveData<T> {
             throw new NullPointerException("the observers of " + TAG + this + " is null");
         }
         Class<?> classOfSafeIterableMap = mObservers.getClass();
-        Method putIfAbsent = classOfSafeIterableMap.getDeclaredMethod("putIfAbsent",
-                Object.class, Object.class);
+        Method putIfAbsent = classOfSafeIterableMap.getDeclaredMethod("putIfAbsent", Object.class, Object.class);
         putIfAbsent.setAccessible(true);
         return putIfAbsent.invoke(mObservers, observer, wrapper);
     }

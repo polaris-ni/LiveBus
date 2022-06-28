@@ -1,9 +1,11 @@
+@file:Suppress("unused")
+
 package com.treasure.bus.core
 
 import androidx.annotation.MainThread
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.LiveData4Bus
+import androidx.lifecycle.CustomLiveData
 import androidx.lifecycle.Observer
 import com.treasure.bus.log.Logger
 import java.util.logging.Level
@@ -15,136 +17,127 @@ import java.util.logging.Level
  */
 class LiveEvent<T> constructor(
     private val key: String,
-    private val lifecycleObserverAlwaysActive: Boolean,
+    private val targetState: Lifecycle.State = Lifecycle.State.CREATED,
     private val autoClear: Boolean = false
-) : Observable<T> {
+) {
 
-    private val liveData: LifecycleLiveData<T> = LifecycleLiveData(key)
+    private val liveData: LiveData4Bus<T> = LiveData4Bus(key)
 
     /**
-     * 进程内发送消息
+     * 发送事件
      *
-     * @param value 发送的消息
+     * @param value     发送的事件
+     * @return [Result]
      */
-    override fun post(value: T) {
-        mainLaunch {
-            postInternal(value)
-        }
+    fun post(value: T) = mainLaunch {
+        postInternal(value)
     }
 
     /**
-     * 进程内发送消息，延迟发送
+     * 延迟发送事件
      *
-     * @param value 发送的消息
-     * @param duration 延迟毫秒数
+     * @param value     事件
+     * @param duration  延迟
+     * @return [Result]
      */
-    override fun postDelay(value: T, duration: Long) {
-        mainLaunch(duration) {
-            postInternal(value)
-        }
+    fun postDelay(value: T, duration: Long) = mainLaunch(duration) {
+        postInternal(value)
     }
 
     /**
-     * 进程内发送消息，延迟发送，带生命周期
-     * 如果延时发送消息的时候sender处于非激活状态，消息取消发送
+     * 订阅事件
      *
-     * @param sender 消息发送者
-     * @param value 发送的消息
-     * @param duration 延迟毫秒数
+     * @param owner     LifecycleOwner
+     * @param observer  观察者
+     * @return [Result]
      */
-    override fun postDelay(sender: LifecycleOwner, value: T, duration: Long) {
-        mainLaunch(duration) {
-            if (sender.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
-                postInternal(value)
-            }
-        }
+    fun observe(owner: LifecycleOwner, observer: Observer<T>) = mainLaunch {
+        observeInternal(owner, observer, false)
     }
 
     /**
-     * 注册一个Observer，生命周期感知，自动取消订阅
+     * 订阅一个粘性事件
      *
-     * @param owner    LifecycleOwner
-     * @param observer 观察者
+     * @param owner     LifecycleOwner
+     * @param observer  观察者
+     * @return [Result]
      */
-    override fun observe(owner: LifecycleOwner, isSticky: Boolean, observer: Observer<T>) {
-        mainLaunch {
-            if (!isSticky) {
-                observeInternal(owner, observer)
-            } else {
-                observeStickyInternal(owner, observer)
-            }
-        }
+    fun observeSticky(owner: LifecycleOwner, observer: Observer<T>) = mainLaunch {
+        observeInternal(owner, observer, true)
     }
 
     /**
-     * 注册一个Observer，需手动解除绑定
+     * 注册一个Observer，需要手动解除绑定
      *
-     * @param observer 观察者
+     * @param observer  观察者
+     * @return [Result]
      */
-    override fun observeForever(observer: Observer<T>, isSticky: Boolean) {
-        mainLaunch {
-            if (!isSticky) {
-                observeForeverInternal(observer)
-            } else {
-                observeStickyForeverInternal(observer)
-            }
-        }
+    fun observeManual(observer: Observer<T>) = mainLaunch {
+        observeManualInternal(observer, false)
     }
 
     /**
-     * 通过observeForever或observeStickyForever注册的，需要调用该方法取消订阅
+     * 粘性地注册一个Observer，需要手动解除绑定
      *
-     * @param observer 观察者
+     * @param observer  观察者
+     * @return [Result]
      */
-    override fun removeObserver(observer: Observer<T>) {
-        if (isMainThread()) {
-            removeObserverInternal(observer)
-        } else {
-            mainLaunch {
-                removeObserverInternal(observer)
-            }
-        }
+    fun observeManualSticky(observer: Observer<T>) = mainLaunch {
+        observeManualInternal(observer, true)
     }
 
+    /**
+     * 取消订阅
+     *
+     * @param observer  观察者
+     * @return [Result]
+     */
+    fun removeObserver(observer: Observer<T>) = mainLaunch {
+        liveData.removeObserver(observer)
+    }
+
+    /**
+     * 发送事件的真正实现
+     *
+     * @param value 事件
+     */
     @MainThread
     private fun postInternal(value: T) {
         Logger.log(Level.INFO, "post: $value to $key")
         liveData.value = value
     }
 
+    /**
+     * 订阅事件的真正实现
+     *
+     * @param owner     [LifecycleOwner]
+     * @param observer  观察者
+     * @param isSticky  是否粘性
+     */
     @MainThread
-    private fun observeInternal(owner: LifecycleOwner, observer: Observer<T>) {
+    private fun observeInternal(owner: LifecycleOwner, observer: Observer<T>, isSticky: Boolean) {
         val observerWrapper = ObserverWrapper(observer)
-        observerWrapper.preventNextEvent = liveData.version > LiveData4Bus.START_VERSION
+        if (!isSticky) {
+            observerWrapper.shouldCallback = liveData.version > CustomLiveData.START_VERSION
+        }
         liveData.observe(owner, observerWrapper)
-        Logger.log(Level.INFO, "observe: $key by $owner $observer")
+        Logger.log(Level.INFO, "observe${if (isSticky) " sticky" else ""}: $key by $owner $observer")
     }
 
+    /**
+     * 脱离生命周期的订阅的实现
+     *
+     * @param observer  观察者
+     * @param isSticky  是否粘性
+     */
     @MainThread
-    private fun observeStickyInternal(owner: LifecycleOwner, observer: Observer<T>) {
+    private fun observeManualInternal(observer: Observer<T>, isSticky: Boolean) {
         val observerWrapper = ObserverWrapper(observer)
-        liveData.observe(owner, observerWrapper)
-        Logger.log(Level.INFO, "sticky observe: $key by $owner $observer")
-    }
-
-    @MainThread
-    private fun observeForeverInternal(observer: Observer<T>) {
-        val observerWrapper = ObserverWrapper(observer)
-        observerWrapper.preventNextEvent = liveData.version > LiveData4Bus.START_VERSION
+        if (!isSticky) {
+            observerWrapper.shouldCallback = liveData.version > CustomLiveData.START_VERSION
+        }
         liveData.observeForever(observerWrapper)
-        Logger.log(Level.INFO, "observe forever: $key by $observer")
-    }
-
-    @MainThread
-    private fun observeStickyForeverInternal(observer: Observer<T>) {
-        val observerWrapper = ObserverWrapper(observer)
-        liveData.observeForever(observerWrapper)
-        Logger.log(Level.INFO, "sticky observe forever: $key by $observer")
-    }
-
-    @MainThread
-    private fun removeObserverInternal(observer: Observer<T>) {
-        liveData.removeObserver(observer)
+        Logger.log(Level.INFO, "observe forever${if (isSticky) " sticky" else ""}: $key by $observer")
     }
 
     /**
@@ -152,8 +145,7 @@ class LiveEvent<T> constructor(
      * @date 2022/6/26
      * description LifecycleLiveData
      */
-    inner class LifecycleLiveData<T>(private val key: String) :
-        LiveData4Bus<T>(if (lifecycleObserverAlwaysActive) Lifecycle.State.CREATED else Lifecycle.State.STARTED) {
+    private inner class LiveData4Bus<T>(private val key: String) : CustomLiveData<T>(targetState) {
         override fun removeObserver(observer: Observer<in T>) {
             super.removeObserver(observer)
             if (autoClear && !liveData.hasObservers()) {
